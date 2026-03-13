@@ -1,0 +1,182 @@
+<!DOCTYPE html><html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORIGINS 7.0</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="manifest" href="manifest.json">
+<style>
+body{background:#050505;color:white;font-family:Segoe UI;margin:0;padding:15px;display:flex;flex-direction:column;align-items:center}
+.card{background:#111;border:1px solid #333;border-radius:12px;padding:15px;width:100%;max-width:600px;margin-bottom:12px}
+.tabs{display:flex;width:100%;max-width:600px;margin-bottom:10px;flex-wrap:wrap}
+.tab{flex:1;padding:10px;border:none;background:#333;color:white}
+.active{background:#7b2ae8}
+.bar{height:12px;background:#333;border-radius:6px;overflow:hidden;margin:6px 0}
+.fill{height:100%}
+.xp{background:#7b2ae8}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#1a1a1a;padding:8px;border-radius:6px}
+.btn{border:none;padding:6px 10px;border-radius:6px;font-weight:bold}
+.up{background:#2ecc71}
+.down{background:#ff4d4d}
+.habit{display:flex;justify-content:space-between;background:#1a1a1a;padding:8px;border-radius:6px;margin-top:6px}
+.loot{background:#001a33;padding:8px;border-radius:6px;margin-top:6px}
+canvas{background:#111;border-radius:8px}
+</style>
+</head>
+<body><h2 id="nameDisp">PERSONAGEM</h2>
+<div>LVL <span id="lvl">1</span></div>
+<div>🔥 Streak: <span id="streak">0</span></div><div class="tabs">
+<button class="tab active" onclick="tab('status',this)">Status</button>
+<button class="tab" onclick="tab('habits',this)">Hábitos</button>
+<button class="tab" onclick="tab('focus',this)">Foco</button>
+<button class="tab" onclick="tab('loot',this)">Itens</button>
+<button class="tab" onclick="tab('statsGraph',this)">Gráficos</button>
+</div><div id="status" class="card">
+<input id="name" placeholder="Nome">
+<div class="bar"><div id="xpBar" class="fill xp"></div></div>
+<div><span id="xp">0</span>/100 XP</div>
+</div><div id="habits" class="card" style="display:none">
+<input id="habitInput" placeholder="Novo hábito">
+<button class="btn up" onclick="addHabit()">Adicionar</button>
+<div id="habitList"></div>
+</div><div id="focus" class="card" style="display:none">
+<div id="timer">25:00</div>
+<button class="btn up" onclick="startTimer()">Iniciar</button>
+</div><div id="loot" class="card" style="display:none">
+<b>Itens desbloqueados</b>
+<div id="lootList"></div>
+</div><div id="statsGraph" class="card" style="display:none">
+<canvas id="chart"></canvas>
+</div><button onclick="save()">Salvar</button>
+
+<script>
+
+let p={name:'',lvl:1,xp:0,streak:0,habits:[],loot:[],history:[]}
+
+let time=1500
+let timerInterval
+
+function xp(v){
+p.xp+=v
+if(p.xp>=100){
+p.xp=0
+p.lvl++
+unlockLoot()
+}
+render()
+}
+
+function unlockLoot(){
+let items=["Espada da Disciplina","Armadura da Consistência","Anel do Foco"]
+let item=items[Math.floor(Math.random()*items.length)]
+p.loot.push(item)
+renderLoot()
+}
+
+function addHabit(){
+let h=habitInput.value
+if(!h)return
+p.habits.push({name:h,done:false})
+habitInput.value=''
+renderHabits()
+}
+
+function toggleHabit(i){
+p.habits[i].done=!p.habits[i].done
+if(p.habits[i].done)xp(10)
+renderHabits()
+}
+
+function renderHabits(){
+habitList.innerHTML=''
+p.habits.forEach((h,i)=>{
+let div=document.createElement('div')
+div.className='habit'
+div.innerHTML=`<span>${h.name}</span><button onclick='toggleHabit(${i})'>${h.done?'✓':'Completar'}</button>`
+habitList.appendChild(div)
+})
+}
+
+function renderLoot(){
+lootList.innerHTML=''
+p.loot.forEach(l=>{
+let div=document.createElement('div')
+div.className='loot'
+div.innerText=l
+lootList.appendChild(div)
+})
+}
+
+function startTimer(){
+clearInterval(timerInterval)
+timerInterval=setInterval(()=>{
+time--
+let m=Math.floor(time/60)
+let s=time%60
+if(s<10)s='0'+s
+
+timer.innerText=m+":"+s
+
+if(time<=0){
+clearInterval(timerInterval)
+xp(20)
+notify("Sessão de foco completa")
+}
+
+},1000)
+}
+
+function notify(msg){
+if(Notification.permission==='granted')
+new Notification(msg)
+}
+
+if("Notification" in window)
+Notification.requestPermission()
+
+function renderChart(){
+let ctx=document.getElementById('chart')
+new Chart(ctx,{type:'line',data:{labels:p.history,datasets:[{label:'Level',data:p.history.map((_,i)=>i+1)}]}})
+}
+
+function render(){
+nameDisp.innerText=name.value||"PERSONAGEM"
+lvl.innerText=p.lvl
+xp.innerText=p.xp
+xpBar.style.width=(p.xp)+'%'
+}
+
+function tab(id,btn){
+status.style.display='none'
+habits.style.display='none'
+focus.style.display='none'
+loot.style.display='none'
+statsGraph.style.display='none'
+
+document.getElementById(id).style.display='block'
+
+if(id==='statsGraph')renderChart()
+
+Array.from(document.querySelectorAll('.tab')).forEach(t=>t.classList.remove('active'))
+btn.classList.add('active')
+}
+
+function save(){
+p.name=name.value
+localStorage.setItem('origins7',JSON.stringify(p))
+}
+
+function load(){
+let d=localStorage.getItem('origins7')
+if(d)p=JSON.parse(d)
+name.value=p.name
+renderHabits()
+renderLoot()
+render()
+}
+
+load()
+
+</script></body>
+</html>
